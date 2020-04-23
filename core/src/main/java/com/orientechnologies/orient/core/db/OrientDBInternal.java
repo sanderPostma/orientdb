@@ -25,6 +25,7 @@ import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.command.script.OScriptManager;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.OStorage;
 
 import java.io.InputStream;
@@ -241,7 +242,7 @@ public interface OrientDBInternal extends AutoCloseable, OSchedulerInternal {
   void restore(String name, String user, String password, ODatabaseType type, String path, OrientDBConfig config);
 
   void restore(String name, InputStream in, Map<String, Object> options, Callable<Object> callable,
-      OCommandOutputListener iListener);
+               OCommandOutputListener iListener);
 
   /**
    * Close the factory with all related databases and pools.
@@ -296,6 +297,14 @@ public interface OrientDBInternal extends AutoCloseable, OSchedulerInternal {
   }
 
   default void networkRestore(String databaseName, InputStream in, Callable<Object> callback) {
+    throw new UnsupportedOperationException();
+  }
+
+  default OResultSet executeServerScript(String script, Map<String, Object> params) {
+    throw new UnsupportedOperationException();
+  }
+
+  default OResultSet executeServerScript(String script, Object... params) {
     throw new UnsupportedOperationException();
   }
 }

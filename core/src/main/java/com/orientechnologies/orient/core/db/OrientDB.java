@@ -1,3 +1,4 @@
+
 /*
  *
  *  *  Copyright 2010-2016 OrientDB LTD (http://orientdb.com)
@@ -20,9 +21,11 @@
 package com.orientechnologies.orient.core.db;
 
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * OrientDB management environment, it allow to connect to an environment and manipulate databases or open sessions.
@@ -343,6 +346,14 @@ public class OrientDB implements AutoCloseable {
       cachedPools.forEach((internalPool, pool) -> pool.close());
       cachedPools.clear();
     }
+  }
+
+  public OResultSet execute(String script, Map<String, Object> params) {
+    return internal.executeServerScript(script, params);
+  }
+
+  public OResultSet execute(String script, Object... params) {
+    return internal.executeServerScript(script, params);
   }
 
   OrientDBInternal getInternal() {
