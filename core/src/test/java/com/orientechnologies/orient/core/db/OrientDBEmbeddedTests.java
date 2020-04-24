@@ -4,8 +4,11 @@ import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.sql.executor.OResult;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
 import com.orientechnologies.orient.core.storage.impl.local.OAbstractPaginatedStorage;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.List;
@@ -105,7 +108,7 @@ public class OrientDBEmbeddedTests {
 
       //spawn 20 threads
       List<CompletableFuture<Void>> futures = IntStream.range(0, 19).boxed().map(i -> CompletableFuture.runAsync(acquirer))
-          .collect(Collectors.toList());
+              .collect(Collectors.toList());
 
       futures.forEach(cf -> cf.join());
 
@@ -263,7 +266,7 @@ public class OrientDBEmbeddedTests {
   @Test
   public void testPoolFactoryCleanUp() throws Exception {
     OrientDBConfig config = OrientDBConfig.builder().addConfig(OGlobalConfiguration.DB_CACHED_POOL_CAPACITY, 2)
-        .addConfig(OGlobalConfiguration.DB_CACHED_POOL_CLEAN_UP_TIMEOUT, 1_000).build();
+            .addConfig(OGlobalConfiguration.DB_CACHED_POOL_CLEAN_UP_TIMEOUT, 1_000).build();
     OrientDB orientDB = new OrientDB("embedded:testdb", config);
     orientDB.createIfNotExists("testdb", ODatabaseType.MEMORY);
     orientDB.createIfNotExists("testdb1", ODatabaseType.MEMORY);
@@ -463,6 +466,24 @@ public class OrientDBEmbeddedTests {
     session1.close();
     orientDb1.drop("testPersistentUUID");
     orientDb1.close();
+
+  }
+
+
+  @Test
+  public void testCreateDatabaseViaSQL() {
+    String dbName = "testCreateDatabaseViaSQL";
+    OrientDB orientDb = new OrientDB("embedded:./target/", OrientDBConfig.defaultConfig());
+    try (OResultSet result = orientDb.execute("create database " + dbName + " plocal")) {
+      Assert.assertTrue(result.hasNext());
+      OResult item = result.next();
+      Assert.assertEquals(true, item.getProperty("created"));
+    }
+    Assert.assertTrue(orientDb.exists(dbName));
+
+
+    orientDb.drop(dbName);
+    orientDb.close();
 
   }
 
