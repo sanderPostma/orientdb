@@ -30,6 +30,7 @@ import com.orientechnologies.orient.core.command.OCommandContext;
 import com.orientechnologies.orient.core.command.OCommandExecutor;
 import com.orientechnologies.orient.core.command.OCommandExecutorAbstract;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
+import com.orientechnologies.orient.core.db.OrientDBInternal;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocument;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
@@ -66,6 +67,10 @@ public class OSQLEngine {
 
   public static OStatement parse(String query, ODatabaseDocumentInternal db) {
     return OStatementCache.get(query, db);
+  }
+
+  public static OServerStatement parseServerStatement(String query, OrientDBInternal db) {
+    return OStatementCache.getServerStatement(query, db);
   }
 
   public static List<OStatement> parseScript(String script, ODatabaseDocumentInternal db) {
