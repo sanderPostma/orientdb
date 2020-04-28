@@ -19,10 +19,7 @@ import com.orientechnologies.orient.core.command.OCommandRequestText;
 import com.orientechnologies.orient.core.command.OCommandResultListener;
 import com.orientechnologies.orient.core.config.OContextConfiguration;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
-import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
-import com.orientechnologies.orient.core.db.ODatabaseRecordThreadLocal;
-import com.orientechnologies.orient.core.db.ODatabaseType;
-import com.orientechnologies.orient.core.db.OLiveQueryMonitor;
+import com.orientechnologies.orient.core.db.*;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordOperation;
 import com.orientechnologies.orient.core.db.tool.ODatabaseImport;
@@ -91,8 +88,8 @@ import java.util.stream.Stream;
 public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
 
   private final OClientConnection connection;
-  private final OServer           server;
-  private final HandshakeInfo     handshakeInfo;
+  private final OServer server;
+  private final HandshakeInfo handshakeInfo;
 
   public OConnectionBinaryExecutor(OClientConnection connection, OServer server) {
     this(connection, server, null);
@@ -165,13 +162,13 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       server.restore(request.getDatabaseName(), request.getBackupPath());
     } else {
       server.createDatabase(request.getDatabaseName(), ODatabaseType.valueOf(request.getStorageMode().toUpperCase(Locale.ENGLISH)),
-          null);
+              null);
     }
     OLogManager.instance().info(this, "Created database '%s' of type '%s'", request.getDatabaseName(), request.getStorageMode());
 
     // TODO: it should be here an additional check for open with the right user
     connection.setDatabase(
-        server.openDatabase(request.getDatabaseName(), connection.getData().serverUsername, null, connection.getData(), true));
+            server.openDatabase(request.getDatabaseName(), connection.getData().serverUsername, null, connection.getData(), true));
 
     return new OCreateDatabaseResponse();
   }
@@ -254,7 +251,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     final String clusterName = connection.getDatabase().getClusterNameById(request.getClusterId());
     if (clusterName == null)
       throw new IllegalArgumentException("Cluster " + request.getClusterId()
-          + " does not exist anymore. Refresh the db structure or just reconnect to the database");
+              + " does not exist anymore. Refresh the db structure or just reconnect to the database");
 
     boolean result = connection.getDatabase().dropCluster(clusterName);
     return new ODropClusterResponse(result);
@@ -286,7 +283,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       OFetchHelper.checkFetchPlanValid(fetchPlanString);
 
       final byte[] record = ((OClusterBasedStorageConfiguration) connection.getDatabase().getStorage().getConfiguration())
-          .toStream(connection.getData().protocolVersion, StandardCharsets.UTF_8);
+              .toStream(connection.getData().protocolVersion, StandardCharsets.UTF_8);
 
       response = new OReadRecordResponse(OBlob.RECORD_TYPE, 0, record, new HashSet<>());
 
@@ -341,7 +338,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       OFetchHelper.checkFetchPlanValid(fetchPlanString);
 
       final byte[] record = ((OClusterBasedStorageConfiguration) connection.getDatabase().getStorage().getConfiguration())
-          .toStream(connection.getData().protocolVersion, StandardCharsets.UTF_8);
+              .toStream(connection.getData().protocolVersion, StandardCharsets.UTF_8);
 
       response = new OReadRecordIfVersionIsNotLatestResponse(OBlob.RECORD_TYPE, 0, record, new HashSet<>());
 
@@ -369,7 +366,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
           }
         }
         response = new OReadRecordIfVersionIsNotLatestResponse(ORecordInternal.getRecordType(record), record.getVersion(), bytes,
-            recordsToSend);
+                recordsToSend);
       } else {
         response = new OReadRecordIfVersionIsNotLatestResponse((byte) 0, 0, null, null);
       }
@@ -487,28 +484,28 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeHigherPosition(OHigherPhysicalPositionsRequest request) {
     OPhysicalPosition[] nextPositions = connection.getDatabase().getStorage()
-        .higherPhysicalPositions(request.getClusterId(), request.getClusterPosition());
+            .higherPhysicalPositions(request.getClusterId(), request.getClusterPosition());
     return new OHigherPhysicalPositionsResponse(nextPositions);
   }
 
   @Override
   public OBinaryResponse executeCeilingPosition(OCeilingPhysicalPositionsRequest request) {
     final OPhysicalPosition[] previousPositions = connection.getDatabase().getStorage()
-        .ceilingPhysicalPositions(request.getClusterId(), request.getPhysicalPosition());
+            .ceilingPhysicalPositions(request.getClusterId(), request.getPhysicalPosition());
     return new OCeilingPhysicalPositionsResponse(previousPositions);
   }
 
   @Override
   public OBinaryResponse executeLowerPosition(OLowerPhysicalPositionsRequest request) {
     final OPhysicalPosition[] previousPositions = connection.getDatabase().getStorage()
-        .lowerPhysicalPositions(request.getiClusterId(), request.getPhysicalPosition());
+            .lowerPhysicalPositions(request.getiClusterId(), request.getPhysicalPosition());
     return new OLowerPhysicalPositionsResponse(previousPositions);
   }
 
   @Override
   public OBinaryResponse executeFloorPosition(OFloorPhysicalPositionsRequest request) {
     final OPhysicalPosition[] previousPositions = connection.getDatabase().getStorage()
-        .floorPhysicalPositions(request.getClusterId(), request.getPhysicalPosition());
+            .floorPhysicalPositions(request.getClusterId(), request.getPhysicalPosition());
     return new OFloorPhysicalPositionsResponse(previousPositions);
   }
 
@@ -616,25 +613,25 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       switch (operation.getType()) {
       case ORecordOperation.CREATED:
         record = Orient.instance().getRecordFactoryManager()
-            .newInstance(operation.getRecordType(), operation.getId().getClusterId(), database);
+                .newInstance(operation.getRecordType(), operation.getId().getClusterId(), database);
         connection.getData().getSerializer().fromStream(operation.getRecord(), record, null);
         current = (ORecordId) record.getIdentity();
         OCreateRecordResponse createRecordResponse = (OCreateRecordResponse) executeCreateRecord(
-            new OCreateRecordRequest(record, (ORecordId) operation.getId(), operation.getRecordType()));
+                new OCreateRecordRequest(record, (ORecordId) operation.getId(), operation.getRecordType()));
         if (transaction.isActive()) {
           ((OTransactionOptimisticServer) transaction).getCreatedRecords().put((ORecordId) record.getIdentity(), record);
         }
         createdRecords.add(new OCommit37Response.OCreatedRecordResponse(current, createRecordResponse.getIdentity(),
-            createRecordResponse.getVersion()));
+                createRecordResponse.getVersion()));
         break;
       case ORecordOperation.UPDATED:
         record = Orient.instance().getRecordFactoryManager()
-            .newInstance(operation.getRecordType(), operation.getId().getClusterId(), database);
+                .newInstance(operation.getRecordType(), operation.getId().getClusterId(), database);
         connection.getData().getSerializer().fromStream(operation.getRecord(), record, null);
         current = (ORecordId) record.getIdentity();
         OUpdateRecordResponse updateRecordResponse = (OUpdateRecordResponse) executeUpdateRecord(
-            new OUpdateRecordRequest((ORecordId) operation.getId(), record, operation.getVersion(), true,
-                operation.getRecordType()));
+                new OUpdateRecordRequest((ORecordId) operation.getId(), record, operation.getVersion(), true,
+                        operation.getRecordType()));
         if (transaction.isActive()) {
           ((OTransactionOptimisticServer) transaction).getUpdatedRecords().put((ORecordId) record.getIdentity(), record);
         }
@@ -654,8 +651,8 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeCommit(OCommitRequest request) {
     final OTransactionOptimisticProxy tx = new OTransactionOptimisticProxy(connection.getDatabase(), request.getTxId(),
-        request.isUsingLong(), request.getOperations(), request.getIndexChanges(), connection.getData().protocolVersion,
-        connection.getData().getSerializer());
+            request.isUsingLong(), request.getOperations(), request.getIndexChanges(), connection.getData().protocolVersion,
+            connection.getData().getSerializer());
 
     try {
       try {
@@ -745,7 +742,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeFreezeDatabase(OFreezeDatabaseRequest request) {
     ODatabaseDocumentInternal database = server
-        .openDatabase(request.getName(), connection.getServerUser().name, null, connection.getData(), true);
+            .openDatabase(request.getName(), connection.getServerUser().name, null, connection.getData(), true);
     connection.setDatabase(database);
 
     OLogManager.instance().info(this, "Freezing database '%s'", connection.getDatabase().getURL());
@@ -757,7 +754,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeReleaseDatabase(OReleaseDatabaseRequest request) {
     ODatabaseDocumentInternal database = server
-        .openDatabase(request.getName(), connection.getServerUser().name, null, connection.getData(), true);
+            .openDatabase(request.getName(), connection.getServerUser().name, null, connection.getData(), true);
 
     connection.setDatabase(database);
 
@@ -786,8 +783,8 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       final OAbstractPaginatedStorage storage = (OAbstractPaginatedStorage) database.getStorage();
       final OAtomicOperationsManager atomicOperationsManager = storage.getAtomicOperationsManager();
       collectionPointer = atomicOperationsManager.calculateInsideAtomicOperation(null,
-          atomicOperation -> connection.getDatabase().getSbTreeCollectionManager()
-              .createSBTree(request.getClusterId(), atomicOperation, null));
+              atomicOperation -> connection.getDatabase().getSbTreeCollectionManager()
+                      .createSBTree(request.getClusterId(), atomicOperation, null));
     } catch (IOException e) {
       throw OException.wrapException(new ODatabaseException("Error during ridbag creation"), e);
     }
@@ -857,7 +854,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       final OBinarySerializer<Integer> valueSerializer = tree.getValueSerializer();
 
       OTreeInternal.AccumulativeListener<OIdentifiable, Integer> listener = new OTreeInternal.AccumulativeListener<>(
-          request.getPageSize());
+              request.getPageSize());
       tree.loadEntriesMajor(key, request.isInclusive(), true, listener);
       List<Entry<OIdentifiable, Integer>> result = listener.getResult();
       return new OSBTFetchEntriesMajorResponse<>(keySerializer, valueSerializer, result);
@@ -912,7 +909,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     OBinaryProtocolHelper.checkProtocolVersion(this, request.getProtocolVersion());
     if (request.getProtocolVersion() > 36)
       throw new OConfigurationException(
-          "You can use connect as first operation only for protocol  < 37 please use handshake for protocol >= 37");
+              "You can use connect as first operation only for protocol  < 37 please use handshake for protocol >= 37");
     connection.getData().driverName = request.getDriverName();
     connection.getData().driverVersion = request.getDriverVersion();
     connection.getData().protocolVersion = request.getProtocolVersion();
@@ -925,9 +922,9 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
 
     if (!request.isTokenBased()) {
       OLogManager.instance()
-          .warn(this, "Session open with token flag false is not supported anymore please use token based sessions");
+              .warn(this, "Session open with token flag false is not supported anymore please use token based sessions");
       throw new OConfigurationException(
-          "Session open with token flag false is not supported anymore please use token based sessions");
+              "Session open with token flag false is not supported anymore please use token based sessions");
     }
 
     connection.setServerUser(server.serverLogin(request.getUsername(), request.getPassword(), "server.connect"));
@@ -983,7 +980,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     OBinaryProtocolHelper.checkProtocolVersion(this, request.getProtocolVersion());
     if (request.getProtocolVersion() > 36)
       throw new OConfigurationException(
-          "You can use open as first operation only for protocol  < 37 please use handshake for protocol >= 37");
+              "You can use open as first operation only for protocol  < 37 please use handshake for protocol >= 37");
     connection.getData().driverName = request.getDriverName();
     connection.getData().driverVersion = request.getDriverVersion();
     connection.getData().protocolVersion = request.getProtocolVersion();
@@ -991,9 +988,9 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     connection.getData().setSerializationImpl(request.getRecordFormat());
     if (!request.isUseToken()) {
       OLogManager.instance()
-          .warn(this, "Session open with token flag false is not supported anymore please use token based sessions");
+              .warn(this, "Session open with token flag false is not supported anymore please use token based sessions");
       throw new OConfigurationException(
-          "Session open with token flag false is not supported anymore please use token based sessions");
+              "Session open with token flag false is not supported anymore please use token based sessions");
     }
     connection.setTokenBased(request.isUseToken());
     connection.getData().supportsLegacyPushMessages = request.isSupportsPush();
@@ -1001,7 +998,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
 
     try {
       connection.setDatabase(
-          server.openDatabase(request.getDatabaseName(), request.getUserName(), request.getUserPassword(), connection.getData()));
+              server.openDatabase(request.getDatabaseName(), request.getUserName(), request.getUserPassword(), connection.getData()));
     } catch (OException e) {
       server.getClientConnectionManager().disconnect(connection);
       throw e;
@@ -1011,7 +1008,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
 
     if (Boolean.TRUE.equals(connection.getTokenBased())) {
       token = server.getTokenHandler()
-          .getSignedBinaryToken(connection.getDatabase(), connection.getDatabase().getUser(), connection.getData());
+              .getSignedBinaryToken(connection.getDatabase(), connection.getDatabase().getUser(), connection.getData());
       // TODO: do not use the parse split getSignedBinaryToken in two methods.
       server.getClientConnectionManager().connect(connection.getProtocol(), connection, token, server.getTokenHandler());
     }
@@ -1035,7 +1032,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       distributedCfg = ((ODistributedServerManager) plugin).getClusterConfiguration();
 
       final ODistributedConfiguration dbCfg = ((ODistributedServerManager) plugin)
-          .getDatabaseConfiguration(connection.getDatabase().getName());
+              .getDatabaseConfiguration(connection.getDatabase().getName());
       if (dbCfg != null) {
         // ENHANCE SERVER CFG WITH DATABASE CFG
         distributedCfg.field("database", dbCfg.getDocument(), OType.EMBEDDED);
@@ -1075,7 +1072,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     connection.getData().setSerializer(handshakeInfo.getSerializer());
     try {
       connection.setDatabase(
-          server.openDatabase(request.getDatabaseName(), request.getUserName(), request.getUserPassword(), connection.getData()));
+              server.openDatabase(request.getDatabaseName(), request.getUserName(), request.getUserPassword(), connection.getData()));
     } catch (OException e) {
       server.getClientConnectionManager().disconnect(connection);
       throw e;
@@ -1084,7 +1081,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     byte[] token = null;
 
     token = server.getTokenHandler()
-        .getSignedBinaryToken(connection.getDatabase(), connection.getDatabase().getUser(), connection.getData());
+            .getSignedBinaryToken(connection.getDatabase(), connection.getDatabase().getUser(), connection.getData());
     // TODO: do not use the parse split getSignedBinaryToken in two methods.
     server.getClientConnectionManager().connect(connection.getProtocol(), connection, token, server.getTokenHandler());
 
@@ -1137,7 +1134,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       cfg.setValue(request.getValue());
       if (!cfg.isChangeableAtRuntime())
         throw new OConfigurationException(
-            "Property '" + request.getKey() + "' cannot be changed at runtime. Change the setting at startup");
+                "Property '" + request.getKey() + "' cannot be changed at runtime. Change the setting at startup");
     } else
       throw new OConfigurationException("Property '" + request.getKey() + "' was not found in global configuration");
 
@@ -1151,7 +1148,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       dbSerializerName = ((ODatabaseDocumentInternal) iRecord.getDatabase()).getSerializer().toString();
     String name = connection.getData().getSerializationImpl();
     if (ORecordInternal.getRecordType(iRecord) == ODocument.RECORD_TYPE && (dbSerializerName == null || !dbSerializerName
-        .equals(name))) {
+            .equals(name))) {
       ((ODocument) iRecord).deserializeFields();
       ORecordSerializer ser = ORecordSerializerFactory.instance().getFormat(name);
       stream = ser.toStream(iRecord);
@@ -1159,6 +1156,30 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       stream = iRecord.toStream();
 
     return stream;
+  }
+
+  @Override
+  public OBinaryResponse executeServerQuery(OServerQueryRequest request) {
+    OrientDB orientdb = server.getContext();
+
+    OResultSet rs;
+
+    if (request.isNamedParams()) {
+      rs = orientdb.execute(request.getStatement(), request.getNamedParameters());
+    } else {
+      rs = orientdb.execute(request.getStatement(), request.getPositionalParameters());
+    }
+
+
+    //copy the result-set to make sure that the execution is successful
+    Stream<OResult> stream = rs.stream();
+    List<OResultInternal> rsCopy = stream.map((r) -> (OResultInternal) r).collect(Collectors.toList());
+
+    boolean hasNext = rs.hasNext();
+    boolean txChanges = false;
+
+    return new OServerQueryResponse(((OLocalResultSetLifecycleDecorator) rs).getQueryId(), txChanges, rsCopy, rs.getExecutionPlan(),
+            false, rs.getQueryStats(), false);
   }
 
   @Override
@@ -1206,7 +1227,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     database.getSharedContext().unregisterListener(metadataListener);
 
     return new OQueryResponse(((OLocalResultSetLifecycleDecorator) rs).getQueryId(), txChanges, rsCopy, rs.getExecutionPlan(),
-        hasNext, rs.getQueryStats(), metadataListener.isUpdated());
+            hasNext, rs.getQueryStats(), metadataListener.isUpdated());
   }
 
   @Override
@@ -1223,7 +1244,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeQueryNextPage(OQueryNextPageRequest request) {
     OLocalResultSetLifecycleDecorator rs = (OLocalResultSetLifecycleDecorator) connection.getDatabase()
-        .getActiveQuery(request.getQueryId());
+            .getActiveQuery(request.getQueryId());
 
     if (rs == null) {
       throw new ODatabaseException(String.format("No query with id '%s' found probably expired session", request.getQueryId()));
@@ -1244,7 +1265,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeBeginTransaction(OBeginTransactionRequest request) {
     final OTransactionOptimisticServer tx = new OTransactionOptimisticServer(connection.getDatabase(), request.getTxId(),
-        request.isUsingLog(), request.getOperations(), request.getIndexChanges());
+            request.isUsingLog(), request.getOperations(), request.getIndexChanges());
     try {
       connection.getDatabase().rawBegin(tx);
     } catch (final ORecordNotFoundException e) {
@@ -1257,7 +1278,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeBeginTransaction38(OBeginTransaction38Request request) {
     final OTransactionOptimisticServer tx = new OTransactionOptimisticServer(connection.getDatabase(), request.getTxId(),
-        request.isUsingLog(), request.getOperations(), request.getIndexChanges());
+            request.isUsingLog(), request.getOperations(), request.getIndexChanges());
     try {
       connection.getDatabase().rawBegin(tx);
     } catch (final ORecordNotFoundException e) {
@@ -1273,7 +1294,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     final OTransactionOptimisticServer tx;
     if (request.isHasContent()) {
       tx = new OTransactionOptimisticServer(database, request.getTxId(), request.isUsingLog(), request.getOperations(),
-          request.getIndexChanges());
+              request.getIndexChanges());
       try {
         database.rawBegin(tx);
       } catch (final ORecordNotFoundException e) {
@@ -1293,7 +1314,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     for (Entry<ORecordId, ORecord> entry : tx.getCreatedRecords().entrySet()) {
       ORecord record = entry.getValue();
       createdRecords
-          .add(new OCommit37Response.OCreatedRecordResponse(entry.getKey(), (ORecordId) record.getIdentity(), record.getVersion()));
+              .add(new OCommit37Response.OCreatedRecordResponse(entry.getKey(), (ORecordId) record.getIdentity(), record.getVersion()));
     }
 
     List<OCommit37Response.OUpdatedRecordResponse> updatedRecords = new ArrayList<>(tx.getUpdatedRecords().size());
@@ -1323,7 +1344,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     final OTransactionOptimisticServer tx;
     if (request.isHasContent()) {
       tx = new OTransactionOptimisticServer(database, request.getTxId(), request.isUsingLog(), request.getOperations(),
-          request.getIndexChanges());
+              request.getIndexChanges());
       try {
         database.rawBegin(tx);
       } catch (final ORecordNotFoundException e) {
@@ -1343,7 +1364,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
     for (Entry<ORecordId, ORecord> entry : tx.getCreatedRecords().entrySet()) {
       ORecord record = entry.getValue();
       createdRecords
-          .add(new OCommit37Response.OCreatedRecordResponse(entry.getKey(), (ORecordId) record.getIdentity(), record.getVersion()));
+              .add(new OCommit37Response.OCreatedRecordResponse(entry.getKey(), (ORecordId) record.getIdentity(), record.getVersion()));
     }
 
     List<OCommit37Response.OUpdatedRecordResponse> updatedRecords = new ArrayList<>(tx.getUpdatedRecords().size());
@@ -1383,7 +1404,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
       throw new ODatabaseException("No Transaction Active");
     OTransactionOptimistic tx = (OTransactionOptimistic) database.getTransaction();
     return new OFetchTransaction38Response(tx.getId(), tx.getRecordOperations(), tx.getIndexOperations(), tx.getUpdatedRids(),
-        database);
+            database);
   }
 
   @Override
@@ -1468,7 +1489,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   public OBinaryResponse executeSubscribeLiveQuery(OSubscribeLiveQueryRequest request) {
     ONetworkProtocolBinary protocol = (ONetworkProtocolBinary) connection.getProtocol();
     OServerLiveQueryResultListener listener = new OServerLiveQueryResultListener(protocol,
-        connection.getDatabase().getSharedContext());
+            connection.getDatabase().getSharedContext());
     OLiveQueryMonitor monitor = connection.getDatabase().live(request.getQuery(), listener, request.getParams());
     listener.setMonitorId(monitor.getMonitorId());
     return new OSubscribeLiveQueryResponse(monitor.getMonitorId());
@@ -1477,7 +1498,7 @@ public final class OConnectionBinaryExecutor implements OBinaryRequestExecutor {
   @Override
   public OBinaryResponse executeDistributedConnect(ODistributedConnectRequest request) {
     HandshakeInfo handshakeInfo = new HandshakeInfo((short) OChannelBinaryProtocol.PROTOCOL_VERSION_38, "OrientDB Distributed", "",
-        (byte) 0, OChannelBinaryProtocol.ERROR_MESSAGE_JAVA);
+            (byte) 0, OChannelBinaryProtocol.ERROR_MESSAGE_JAVA);
     ((ONetworkProtocolBinary) connection.getProtocol()).setHandshakeInfo(handshakeInfo);
 
     //TODO:check auth type

@@ -75,6 +75,8 @@ public class OChannelBinaryProtocol {
   public static final byte REQUEST_CLOSE_QUERY                       = 46;                 // since 3.0
   public static final byte REQUEST_QUERY_NEXT_PAGE                   = 47;                 // since 3.0
 
+  public static final byte REQUEST_SERVER_QUERY                      = 50;                 // since 3.2
+
   public static final byte REQUEST_TX_COMMIT   = 60;
   public static final byte REQUEST_TX_BEGIN    = 61;
   public static final byte REQUEST_TX_REBEGIN  = 62;
