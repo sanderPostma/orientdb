@@ -431,4 +431,9 @@ public class OrientDBRemote implements OrientDBInternal {
   public OResultSet executeServerStatement(String statement, String user, String pw, Object... params) {
     return connectEndExecute("", user, pw, admin -> admin.executeServerStatement(statement, params));
   }
+
+  @Override
+  public OResultSet executeServerStatement(String statement, String user, String pw, Map<String, Object> params) {
+    return connectEndExecute("", user, pw, admin -> admin.executeServerStatement(statement, params));
+  }
 }

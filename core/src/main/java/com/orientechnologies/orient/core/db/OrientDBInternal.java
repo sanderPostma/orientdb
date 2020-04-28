@@ -300,7 +300,7 @@ public interface OrientDBInternal extends AutoCloseable, OSchedulerInternal {
     throw new UnsupportedOperationException();
   }
 
-  default OResultSet executeServerStatement(String script, Map<String, Object> params) {
+  default OResultSet executeServerStatement(String script, String user, String pw, Map<String, Object> params) {
     throw new UnsupportedOperationException();
   }
 
