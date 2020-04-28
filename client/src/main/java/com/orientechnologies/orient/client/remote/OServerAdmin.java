@@ -484,4 +484,8 @@ public class OServerAdmin {
   public OResultSet executeServerStatement(String statement,  Object... params) {
     return storage.serverCommand(statement, params).getResult();
   }
+
+  public OResultSet executeServerStatement(String statement,  Map<String, Object> params) {
+    return storage.serverCommand(statement, params).getResult();
+  }
 }
