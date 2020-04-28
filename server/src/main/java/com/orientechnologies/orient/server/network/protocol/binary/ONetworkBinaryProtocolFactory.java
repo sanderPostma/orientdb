@@ -144,6 +144,9 @@ public class ONetworkBinaryProtocolFactory {
     case OChannelBinaryProtocol.REQUEST_COMMAND:
       return new OCommandRequest();
 
+    case OChannelBinaryProtocol.REQUEST_SERVER_QUERY:
+      return new OServerQueryRequest();
+
     case OChannelBinaryProtocol.REQUEST_QUERY:
       return new OQueryRequest();
 
@@ -323,6 +326,9 @@ public class ONetworkBinaryProtocolFactory {
 
     case OChannelBinaryProtocol.REQUEST_COMMAND:
       return new OCommandRequest();
+
+    case OChannelBinaryProtocol.REQUEST_SERVER_QUERY:
+      return new OServerQueryRequest();
 
     case OChannelBinaryProtocol.REQUEST_QUERY:
       return new OQueryRequest();

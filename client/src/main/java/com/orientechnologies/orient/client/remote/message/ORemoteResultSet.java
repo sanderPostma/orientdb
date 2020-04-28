@@ -16,24 +16,26 @@ import java.util.Optional;
  */
 public class ORemoteResultSet implements OResultSet {
 
-  private final ODatabaseDocumentRemote  db;
-  private final String                   queryId;
-  private       List<OResultInternal>    currentPage;
-  private       Optional<OExecutionPlan> executionPlan;
-  private       Map<String, Long>        queryStats;
-  private       boolean                  hasNextPage;
+  private final ODatabaseDocumentRemote db;
+  private final String queryId;
+  private List<OResultInternal> currentPage;
+  private Optional<OExecutionPlan> executionPlan;
+  private Map<String, Long> queryStats;
+  private boolean hasNextPage;
 
   public ORemoteResultSet(ODatabaseDocumentRemote db, String queryId, List<OResultInternal> currentPage,
-      Optional<OExecutionPlan> executionPlan, Map<String, Long> queryStats, boolean hasNextPage) {
+                          Optional<OExecutionPlan> executionPlan, Map<String, Long> queryStats, boolean hasNextPage) {
     this.db = db;
     this.queryId = queryId;
     this.currentPage = currentPage;
     this.executionPlan = executionPlan;
     this.queryStats = queryStats;
     this.hasNextPage = hasNextPage;
-    db.queryStarted(queryId, this);
-    for (OResultInternal result : currentPage) {
-      result.bindToCache(db);
+    if (db != null) {
+      db.queryStarted(queryId, this);
+      for (OResultInternal result : currentPage) {
+        result.bindToCache(db);
+      }
     }
   }
 
@@ -50,7 +52,9 @@ public class ORemoteResultSet implements OResultSet {
   }
 
   private void fetchNextPage() {
-    db.fetchNextPage(this);
+    if (db != null) {
+      db.fetchNextPage(this);
+    }
   }
 
   @Override
@@ -66,7 +70,8 @@ public class ORemoteResultSet implements OResultSet {
     }
     OResultInternal internal = currentPage.remove(0);
 
-    if (internal.isRecord() && db.getTransaction().isActive()) {
+
+    if (internal.isRecord() && db != null && db.getTransaction().isActive()) {
       ORecord record = db.getTransaction().getRecord(internal.getRecord().get().getIdentity());
       if (record != null) {
         internal = new OResultInternal(record);
@@ -78,7 +83,7 @@ public class ORemoteResultSet implements OResultSet {
 
   @Override
   public void close() {
-    if (hasNextPage) {
+    if (hasNextPage && db != null) {
       // CLOSES THE QUERY SERVER SIDE ONLY IF THERE IS ANOTHER PAGE. THE SERVER ALREADY AUTOMATICALLY CLOSES THE QUERY AFTER SENDING THE LAST PAGE
       db.closeQuery(queryId);
     }
@@ -107,7 +112,7 @@ public class ORemoteResultSet implements OResultSet {
   }
 
   public void fetched(List<OResultInternal> result, boolean hasNextPage, Optional<OExecutionPlan> executionPlan,
-      Map<String, Long> queryStats) {
+                      Map<String, Long> queryStats) {
     this.currentPage = result;
     this.hasNextPage = hasNextPage;
 

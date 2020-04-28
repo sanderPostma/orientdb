@@ -22,16 +22,17 @@ package com.orientechnologies.orient.core.db;
 
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.log.OLogManager;
-import com.orientechnologies.orient.client.remote.ORemoteConnectionManager;
-import com.orientechnologies.orient.client.remote.OServerAdmin;
-import com.orientechnologies.orient.client.remote.OStorageRemote;
+import com.orientechnologies.orient.client.remote.*;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentRemote;
 import com.orientechnologies.orient.core.db.document.OSharedContextRemote;
+import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.exception.ODatabaseException;
 import com.orientechnologies.orient.core.record.impl.ODocument;
+import com.orientechnologies.orient.core.sql.executor.OResult;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import com.orientechnologies.orient.core.storage.OStorage;
 
 import java.io.IOException;
@@ -48,16 +49,16 @@ import static com.orientechnologies.orient.core.config.OGlobalConfiguration.NETW
  * Created by tglman on 08/04/16.
  */
 public class OrientDBRemote implements OrientDBInternal {
-  protected final    Map<String, OSharedContext> sharedContexts = new HashMap<>();
-  private final      Map<String, OStorageRemote> storages       = new HashMap<>();
-  private final      Set<ODatabasePoolInternal>  pools          = new HashSet<>();
-  private final      String[]                    hosts;
-  private final      OrientDBConfig              configurations;
-  private final      Orient                      orient;
-  private final      OCachedDatabasePoolFactory  cachedPoolFactory;
-  protected volatile ORemoteConnectionManager    connectionManager;
-  private volatile   boolean                     open           = true;
-  private            Timer                       timer;
+  protected final Map<String, OSharedContext> sharedContexts = new HashMap<>();
+  private final Map<String, OStorageRemote> storages = new HashMap<>();
+  private final Set<ODatabasePoolInternal> pools = new HashSet<>();
+  private final String[] hosts;
+  private final OrientDBConfig configurations;
+  private final Orient orient;
+  private final OCachedDatabasePoolFactory cachedPoolFactory;
+  protected volatile ORemoteConnectionManager connectionManager;
+  private volatile boolean open = true;
+  private Timer timer;
 
   public OrientDBRemote(String[] hosts, OrientDBConfig configurations, Orient orient) {
     super();
@@ -123,7 +124,7 @@ public class OrientDBRemote implements OrientDBInternal {
   }
 
   public synchronized ODatabaseDocumentRemotePooled poolOpen(String name, String user, String password,
-      ODatabasePoolInternal pool) {
+                                                             ODatabasePoolInternal pool) {
     OStorageRemote storage = storages.get(name);
     if (storage == null) {
       try {
@@ -201,8 +202,8 @@ public class OrientDBRemote implements OrientDBInternal {
         retry--;
         if (retry == 0)
           throw OException
-              .wrapException(new ODatabaseException("Reached maximum retry limit on admin operations, the server may be offline"),
-                  e);
+                  .wrapException(new ODatabaseException("Reached maximum retry limit on admin operations, the server may be offline"),
+                          e);
       } finally {
         if (admin != null)
           admin.close();
@@ -382,7 +383,7 @@ public class OrientDBRemote implements OrientDBInternal {
 
   @Override
   public void restore(String name, InputStream in, Map<String, Object> options, Callable<Object> callable,
-      OCommandOutputListener iListener) {
+                      OCommandOutputListener iListener) {
     throw new UnsupportedOperationException("raw restore is not supported in remote");
   }
 
@@ -424,5 +425,10 @@ public class OrientDBRemote implements OrientDBInternal {
   @Override
   public <X> Future<X> execute(String database, String user, ODatabaseTask<X> task) {
     throw new UnsupportedOperationException("execute with no session not available in remote");
+  }
+
+  @Override
+  public OResultSet executeServerStatement(String statement, String user, String pw, Object... params) {
+    return connectEndExecute("", user, pw, admin -> admin.executeServerStatement(statement, params));
   }
 }

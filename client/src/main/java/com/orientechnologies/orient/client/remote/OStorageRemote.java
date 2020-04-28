@@ -56,6 +56,7 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.security.OCredentialInterceptor;
 import com.orientechnologies.orient.core.security.OSecurityManager;
 import com.orientechnologies.orient.core.serialization.serializer.record.ORecordSerializerFactory;
+import com.orientechnologies.orient.core.serialization.serializer.record.binary.ORecordSerializerNetworkV37;
 import com.orientechnologies.orient.core.sql.query.OLiveQuery;
 import com.orientechnologies.orient.core.storage.*;
 import com.orientechnologies.orient.core.storage.cluster.OPaginatedCluster;
@@ -948,6 +949,40 @@ public class OStorageRemote extends OStorageAbstract implements OStorageProxy, O
     } else {
       db.queryClosed(response.getQueryId());
     }
+    return new ORemoteQueryResult(rs, response.isTxChanges(), response.isReloadMetadata());
+  }
+
+  public ORemoteQueryResult serverCommand(String query, Object[] args) {
+    int recordsPerPage = OGlobalConfiguration.QUERY_REMOTE_RESULTSET_PAGE_SIZE.getValueAsInteger();
+    if (recordsPerPage <= 0) {
+      recordsPerPage = 100;
+    }
+    OServerQueryRequest request = new OServerQueryRequest("sql", query, args, OServerQueryRequest.COMMAND, ORecordSerializerNetworkV37.INSTANCE, recordsPerPage);
+    OServerQueryResponse response = networkOperationNoRetry(request, "Error on executing command: " + query);
+    ORemoteResultSet rs = new ORemoteResultSet(null, response.getQueryId(), response.getResult(), response.getExecutionPlan(),
+            response.getQueryStats(), response.isHasNextPage());
+//    if (response.isHasNextPage()) {
+//      stickToSession();
+//    } else {
+//      db.queryClosed(response.getQueryId());
+//    }
+    return new ORemoteQueryResult(rs, response.isTxChanges(), response.isReloadMetadata());
+  }
+
+  public ORemoteQueryResult serverCommand(String query, Map args) {
+    int recordsPerPage = OGlobalConfiguration.QUERY_REMOTE_RESULTSET_PAGE_SIZE.getValueAsInteger();
+    if (recordsPerPage <= 0) {
+      recordsPerPage = 100;
+    }
+    OServerQueryRequest request = new OServerQueryRequest("sql", query, args, OServerQueryRequest.COMMAND, ORecordSerializerNetworkV37.INSTANCE, recordsPerPage);
+    OServerQueryResponse response = networkOperationNoRetry(request, "Error on executing command: " + query);
+    ORemoteResultSet rs = new ORemoteResultSet(null, response.getQueryId(), response.getResult(), response.getExecutionPlan(),
+            response.getQueryStats(), response.isHasNextPage());
+//    if (response.isHasNextPage()) {
+//      stickToSession();
+//    } else {
+//      db.queryClosed(response.getQueryId());
+//    }
     return new ORemoteQueryResult(rs, response.isTxChanges(), response.isReloadMetadata());
   }
 
