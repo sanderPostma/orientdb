@@ -63,6 +63,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -87,6 +88,9 @@ public class OSecurityShared implements OSecurityInternal {
 
   /** set of all the security resources defined on properties (used for optimizations) */
   protected Set<OSecurityResourceProperty> filteredProperties;
+
+  protected AtomicBoolean securityCachesValid = new AtomicBoolean(false);
+
 
   /** Uses the ORestrictedOperation ENUM instead. */
   @Deprecated
@@ -1320,11 +1324,20 @@ public class OSecurityShared implements OSecurityInternal {
   }
 
   @Override
-  public void incrementVersion(final ODatabaseSession session) {
+  public synchronized void incrementVersion(final ODatabaseSession session) {
     version.incrementAndGet();
+    securityCachesValid.set(false);
+  }
+
+  protected synchronized void initCaches(ODatabaseSession session){
+    if(securityCachesValid.get()){
+      return;
+    }
+
     securityPredicateCache.clear();
     updateAllFilteredProperties((ODatabaseDocumentInternal) session);
     initPredicateSecurityOptimizations(session);
+    securityCachesValid.set(true);
   }
 
   protected void initPredicateSecurityOptimizations(ODatabaseSession session) {
@@ -1354,7 +1367,7 @@ public class OSecurityShared implements OSecurityInternal {
     if (session.getClass("ORole") == null) {
       return;
     }
-    synchronized (this) {
+
       OResultSet rs = session.query("select name, policies from ORole");
       while (rs.hasNext()) {
         OResult item = rs.next();
@@ -1380,9 +1393,9 @@ public class OSecurityShared implements OSecurityInternal {
           }
           rs.close();
         }
-      }
-      this.roleHasPredicateSecurityForClass = result;
     }
+
+    this.roleHasPredicateSecurityForClass = result;
   }
 
   private boolean isAllAllowed(ODatabaseSession db, OSecurityPolicy policy) {
@@ -1431,18 +1444,9 @@ public class OSecurityShared implements OSecurityInternal {
     if (document.getClassName() == null) {
       return Collections.emptySet();
     }
-    if (roleHasPredicateSecurityForClass != null) {
-      for (OSecurityRole role : session.getUser().getRoles()) {
 
-        Map<String, Boolean> roleMap = roleHasPredicateSecurityForClass.get(role.getName());
-        if (roleMap == null) {
-          return Collections.emptySet(); // TODO hierarchy...?
-        }
-        Boolean val = roleMap.get(document.getClassName());
-        if (!(Boolean.TRUE.equals(val))) {
-          return Collections.emptySet(); // TODO hierarchy...?
-        }
-      }
+    if(!couldHaveActivePredicateSecurityRoles(session, document.getClassName())){
+      return Collections.emptySet();
     }
     Set<String> props = document.getPropertyNames();
     Set<String> result = new HashSet<>();
@@ -1536,17 +1540,8 @@ public class OSecurityShared implements OSecurityInternal {
         className = ((OElement) record).getSchemaType().map(x -> x.getName()).orElse(null);
       }
 
-      if (roleHasPredicateSecurityForClass != null) {
-        for (OSecurityRole role : session.getUser().getRoles()) {
-          Map<String, Boolean> roleMap = roleHasPredicateSecurityForClass.get(role.getName());
-          if (roleMap == null) {
-            return true; // TODO hierarchy...?
-          }
-          Boolean val = roleMap.get(className);
-          if (!(Boolean.TRUE.equals(val))) {
-            return true; // TODO hierarchy...?
-          }
-        }
+      if(!couldHaveActivePredicateSecurityRoles(session, className)){
+        return true;
       }
 
       OBooleanExpression predicate;
@@ -1579,17 +1574,8 @@ public class OSecurityShared implements OSecurityInternal {
         return true;
       }
 
-      if (roleHasPredicateSecurityForClass != null) {
-        for (OSecurityRole role : session.getUser().getRoles()) {
-          Map<String, Boolean> roleMap = roleHasPredicateSecurityForClass.get(role.getName());
-          if (roleMap == null) {
-            return true; // TODO hierarchy...?
-          }
-          Boolean val = roleMap.get(((ODocument) record).getClassName());
-          if (!(Boolean.TRUE.equals(val))) {
-            return true; // TODO hierarchy...?
-          }
-        }
+      if(!couldHaveActivePredicateSecurityRoles(session, ((ODocument) record).getClassName())){
+        return true;
       }
 
       OBooleanExpression predicate =
@@ -1618,19 +1604,10 @@ public class OSecurityShared implements OSecurityInternal {
 
       String className = ((OElement) record).getSchemaType().map(x -> x.getName()).orElse(null);
 
-      if (className != null && roleHasPredicateSecurityForClass != null) {
-        for (OSecurityRole role : session.getUser().getRoles()) {
-          Map<String, Boolean> roleMap = roleHasPredicateSecurityForClass.get(role.getName());
-          if (roleMap == null) {
-            return true; // TODO hierarchy...?
-          }
-          Boolean val = roleMap.get(className);
-          if (!(Boolean.TRUE.equals(val))) {
-            return true; // TODO hierarchy...?
-          }
-        }
+      if(!couldHaveActivePredicateSecurityRoles(session, className)){
+        return true;
       }
-
+      
       OBooleanExpression beforePredicate =
           ((OElement) record)
               .getSchemaType()
@@ -1790,6 +1767,7 @@ public class OSecurityShared implements OSecurityInternal {
   @Override
   public synchronized Set<OSecurityResourceProperty> getAllFilteredProperties(
       ODatabaseDocumentInternal database) {
+    initCaches(database);
     if (filteredProperties == null) {
       updateAllFilteredProperties(database);
     }
@@ -1863,23 +1841,29 @@ public class OSecurityShared implements OSecurityInternal {
   }
 
   public boolean couldHaveActivePredicateSecurityRoles(ODatabaseSession session, String className) {
-    if (session.getUser() == null) {
-      return false;
+    if(!securityCachesValid.get()){
+      initCaches(session);
+      return true;
     }
-    if (roleHasPredicateSecurityForClass != null) {
-      for (OSecurityRole role : session.getUser().getRoles()) {
-        Map<String, Boolean> roleMap = roleHasPredicateSecurityForClass.get(role.getName());
-        if (roleMap == null) {
-          return false; // TODO hierarchy...?
-        }
-        Boolean val = roleMap.get(className);
-        if (Boolean.TRUE.equals(val)) {
-          return true; // TODO hierarchy...?
-        }
+    synchronized (this) {
+      if (session.getUser() == null) {
+        return false;
       }
+      if (roleHasPredicateSecurityForClass != null) {
+        for (OSecurityRole role : session.getUser().getRoles()) {
+          Map<String, Boolean> roleMap = roleHasPredicateSecurityForClass.get(role.getName());
+          if (roleMap == null) {
+            return false; // TODO hierarchy...?
+          }
+          Boolean val = roleMap.get(className);
+          if (Boolean.TRUE.equals(val)) {
+            return true; // TODO hierarchy...?
+          }
+        }
 
-      return false;
+        return false;
+      }
+      return true;
     }
-    return true;
   }
 }
