@@ -46,6 +46,7 @@ import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.executor.OExecutionPlan;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
+import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
 import com.orientechnologies.orient.core.storage.ORecordDuplicatedException;
 import com.orientechnologies.orient.core.storage.ORecordMetadata;
 import com.orientechnologies.orient.core.storage.OStorage;
@@ -932,7 +933,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   }
 
   public void sendDDLCommand(String command, boolean excludeLocal) {
-    if (getStorageDistributed().isLocalEnv()) {
+    if (isLocalEnv()) {
       // ALREADY DISTRIBUTED
       super.command(command, new Object[] {}).close();
       return;
@@ -976,7 +977,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   @Override
   public int addCluster(String iClusterName, Object... iParameters) {
-    if (!getStorageDistributed().isLocalEnv()) {
+    if (!isLocalEnv()) {
       final StringBuilder cmd = new StringBuilder("create cluster `");
       cmd.append(iClusterName);
       cmd.append("`");
@@ -989,7 +990,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   @Override
   public int addCluster(String iClusterName, int iRequestedId) {
-    if (!getStorageDistributed().isLocalEnv()) {
+    if (!isLocalEnv()) {
       final StringBuilder cmd = new StringBuilder("create cluster `");
       cmd.append(iClusterName);
       cmd.append("`");
@@ -1004,7 +1005,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   @Override
   protected boolean dropClusterInternal(String clusterName) {
-    if (getStorageDistributed().isLocalEnv()) {
+    if (isLocalEnv()) {
       final String cmd = "drop cluster `" + clusterName + "`";
       sendDDLCommand(cmd, false);
       return true;
@@ -1015,12 +1016,29 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   @Override
   protected boolean dropClusterInternal(int clusterId) {
-    if (getStorageDistributed().isLocalEnv()) {
+    if (isLocalEnv()) {
       final String cmd = "drop cluster " + clusterId + "";
       sendDDLCommand(cmd, false);
       return true;
     } else {
       return super.dropCluster(clusterId);
     }
+  }
+
+  public boolean isLocalEnv() {
+    return getStorage() instanceof OAutoshardedStorage
+        && ((OAutoshardedStorage) getStorage()).isLocalEnv();
+  }
+
+  public void acquireDistributedExclusiveLock(int timeout) {
+    distributedManager
+        .getLockManagerRequester()
+        .acquireExclusiveLock(getName(), distributedManager.getLocalNodeName(), timeout);
+  }
+
+  public void releaseDistributedExclusiveLock() {
+    distributedManager
+        .getLockManagerRequester()
+        .releaseExclusiveLock(getName(), distributedManager.getLocalNodeName());
   }
 }
