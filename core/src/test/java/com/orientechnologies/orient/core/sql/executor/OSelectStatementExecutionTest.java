@@ -4172,17 +4172,41 @@ public class OSelectStatementExecutionTest {
 
   @Test
   public void testSimpleRangeQueryWithIndex() {
-    String className = "testSimpleRangeQueryWithIndex";
-    OClass clazz = db.getMetadata().getSchema().createClass(className);
-    OProperty prop = clazz.createProperty("name", OType.STRING);
+    final String className = "testSimpleRangeQueryWithIndex";
+    final OClass clazz = db.getMetadata().getSchema().createClass(className);
+    final OProperty prop = clazz.createProperty("name", OType.STRING);
     prop.createIndex(OClass.INDEX_TYPE.NOTUNIQUE);
 
     for (int i = 0; i < 10; i++) {
-      ODocument doc = db.newInstance(className);
+      final ODocument doc = db.newInstance(className);
       doc.setProperty("name", "name" + i);
       doc.save();
     }
-    OResultSet result = db.query("select from " + className + " WHERE name >= 'name5'");
+    final OResultSet result = db.query("select from " + className + " WHERE name >= 'name5'");
+    printExecutionPlan(result);
+
+    for (int i = 0; i < 5; i++) {
+      Assert.assertTrue(result.hasNext());
+      System.out.println(result.next());
+    }
+    Assert.assertFalse(result.hasNext());
+    result.close();
+  }
+
+  @Test
+  public void testSimpleRangeQueryWithOutIndex() {
+    final String className = "testSimpleRangeQueryWithIndex";
+    final OClass clazz = db.getMetadata().getSchema().createClass(className);
+    final OProperty prop = clazz.createProperty("name", OType.STRING);
+    // Hash Index skipped for range query
+    prop.createIndex(OClass.INDEX_TYPE.NOTUNIQUE_HASH_INDEX);
+
+    for (int i = 0; i < 10; i++) {
+      final ODocument doc = db.newInstance(className);
+      doc.setProperty("name", "name" + i);
+      doc.save();
+    }
+    final OResultSet result = db.query("select from " + className + " WHERE name >= 'name5'");
     printExecutionPlan(result);
 
     for (int i = 0; i < 5; i++) {
