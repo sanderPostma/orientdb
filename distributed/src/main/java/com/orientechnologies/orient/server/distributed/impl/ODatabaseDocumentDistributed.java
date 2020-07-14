@@ -609,9 +609,10 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
    */
   public boolean commit2pc(
       ODistributedRequestId transactionId, boolean local, ODistributedRequestId requestId) {
-    getStorageDistributed().resetLastValidBackup();
-    ODistributedDatabase localDistributedDatabase =
-        getStorageDistributed().getLocalDistributedDatabase();
+    ODistributedDatabaseImpl localDistributedDatabase =
+        (ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase();
+    localDistributedDatabase.resetLastValidBackup();
+
     ODistributedServerManager manager = getStorageDistributed().getDistributedManager();
     ONewDistributedTxContextImpl txContext =
         (ONewDistributedTxContextImpl) localDistributedDatabase.getTxContext(transactionId);
@@ -760,7 +761,11 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   }
 
   public void internalBegin2pc(ONewDistributedTxContextImpl txContext, boolean local) {
-    getStorageDistributed().resetLastValidBackup();
+
+    ODistributedDatabaseImpl localDb =
+        (ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase();
+
+    localDb.resetLastValidBackup();
     OTransactionInternal transaction = txContext.getTransaction();
     // This is moved before checks because also the coordinator first node allocate before checks
     if (!local) {
@@ -768,10 +773,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       ((OTransactionOptimistic) transaction).begin();
     }
 
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageBeforeOp("locks", txContext.getReqId());
+    localDb.getManager().messageBeforeOp("locks", txContext.getReqId());
 
     acquireLocksForTx(transaction, txContext);
 
@@ -945,7 +947,9 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       super.command(command, new Object[] {}).close();
       return;
     }
-    getStorageDistributed().resetLastValidBackup();
+    ODistributedDatabaseImpl localDb =
+        (ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase();
+    localDb.resetLastValidBackup();
 
     getStorageDistributed()
         .checkNodeIsMaster(
@@ -1017,17 +1021,21 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       sendDDLCommand(cmd, false);
       return true;
     } else {
+      ((ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase())
+          .resetLastValidBackup();
       return super.dropCluster(clusterName);
     }
   }
 
   @Override
-  protected boolean dropClusterInternal(int clusterId) {
+  public boolean dropClusterInternal(int clusterId) {
     if (isLocalEnv()) {
       final String cmd = "drop cluster " + clusterId + "";
       sendDDLCommand(cmd, false);
       return true;
     } else {
+      ((ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase())
+          .resetLastValidBackup();
       return super.dropCluster(clusterId);
     }
   }
