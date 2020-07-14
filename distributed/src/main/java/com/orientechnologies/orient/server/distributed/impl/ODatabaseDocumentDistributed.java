@@ -12,8 +12,10 @@ import com.hazelcast.core.HazelcastInstanceNotActiveException;
 import com.orientechnologies.common.concur.OOfflineNodeException;
 import com.orientechnologies.common.concur.lock.OInterruptedException;
 import com.orientechnologies.common.exception.OException;
+import com.orientechnologies.common.io.OIOException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.Orient;
+import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.db.ODatabaseDocumentInternal;
 import com.orientechnologies.orient.core.db.OScenarioThreadLocal;
 import com.orientechnologies.orient.core.db.OSharedContext;
@@ -78,6 +80,8 @@ import com.orientechnologies.orient.server.distributed.task.ODistributedRecordLo
 import com.orientechnologies.orient.server.distributed.task.ORemoteTask;
 import com.orientechnologies.orient.server.hazelcast.OHazelcastPlugin;
 import com.orientechnologies.orient.server.plugin.OServerPluginInfo;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.*;
 import java.util.Arrays;
 import java.util.Collections;
@@ -89,6 +93,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
@@ -1063,5 +1068,34 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
     final String localNode = distributedManager.getLocalNodeName();
     distributedManager.setDatabaseStatus(localNode, getName(), freezePrevStatus);
     super.release();
+  }
+
+  @Override
+  public List<String> backup(
+      OutputStream out,
+      Map<String, Object> options,
+      Callable<Object> callable,
+      OCommandOutputListener iListener,
+      int compressionLevel,
+      int bufferSize)
+      throws IOException {
+    final String localNode = distributedManager.getLocalNodeName();
+
+    final ODistributedServerManager.DB_STATUS prevStatus =
+        distributedManager.getDatabaseStatus(localNode, getName());
+    if (prevStatus == ODistributedServerManager.DB_STATUS.ONLINE)
+      // SET STATUS = BACKUP
+      distributedManager.setDatabaseStatus(
+          localNode, getName(), ODistributedServerManager.DB_STATUS.BACKUP);
+
+    try {
+
+      return super.backup(out, options, callable, iListener, compressionLevel, bufferSize);
+
+    } catch (IOException e) {
+      throw OException.wrapException(new OIOException("Error on executing backup"), e);
+    } finally {
+      distributedManager.setDatabaseStatus(localNode, getName(), prevStatus);
+    }
   }
 }
