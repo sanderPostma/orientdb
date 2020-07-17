@@ -49,7 +49,6 @@ import com.orientechnologies.orient.core.record.ORecord;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.executor.OExecutionPlan;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
-import com.orientechnologies.orient.core.storage.OAutoshardedStorage;
 import com.orientechnologies.orient.core.storage.ORecordDuplicatedException;
 import com.orientechnologies.orient.core.storage.ORecordMetadata;
 import com.orientechnologies.orient.core.storage.OStorage;
@@ -108,10 +107,6 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   public ODatabaseDocumentDistributed(OStorage storage, OHazelcastPlugin hazelcastPlugin) {
     super(storage);
     this.distributedManager = hazelcastPlugin;
-  }
-
-  public ODistributedStorage getStorageDistributed() {
-    return (ODistributedStorage) super.getStorage();
   }
 
   /**
@@ -241,20 +236,10 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   @Override
   public boolean sync(boolean forceDeployment, boolean tryWithDelta) {
     checkSecurity(ORule.ResourceGeneric.DATABASE, "sync", ORole.PERMISSION_UPDATE);
-    final OStorage stg = getStorage();
-    if (!(stg instanceof ODistributedStorage))
-      throw new ODistributedException(
-          "SYNC DATABASE command cannot be executed against a non distributed server");
-
-    final ODistributedStorage dStg = (ODistributedStorage) stg;
-
-    final OHazelcastPlugin dManager = (OHazelcastPlugin) dStg.getDistributedManager();
-    if (dManager == null || !dManager.isEnabled())
-      throw new OCommandExecutionException("OrientDB is not started in distributed mode");
 
     final String databaseName = getName();
 
-    return dManager.installDatabase(true, databaseName, forceDeployment, tryWithDelta);
+    return distributedManager.installDatabase(true, databaseName, forceDeployment, tryWithDelta);
   }
 
   @Override
@@ -431,16 +416,14 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
           if (record instanceof ODocument) ((ODocument) record).validate();
         }
       }
-      ODistributedDatabase localDistributedDatabase =
-          getStorageDistributed().getLocalDistributedDatabase();
+      ODistributedDatabase localDistributedDatabase = getDistributedShared();
       final ODistributedConfiguration dbCfg =
           localDistributedDatabase.getDistributedConfiguration();
-      ODistributedServerManager dManager = getStorageDistributed().getDistributedManager();
+      ODistributedServerManager dManager = getDistributedManager();
       final String localNodeName = dManager.getLocalNodeName();
       checkNodeIsMaster(localNodeName, dbCfg, "Transaction Commit");
       ONewDistributedTransactionManager txManager =
-          new ONewDistributedTransactionManager(
-              getStorageDistributed(), dManager, localDistributedDatabase);
+          new ONewDistributedTransactionManager(getStorage(), dManager, localDistributedDatabase);
       int quorum = 0;
       for (String clusterName : txManager.getInvolvedClusters(iTx.getRecordOperations())) {
         final List<String> clusterServers = dbCfg.getServers(clusterName, null);
@@ -516,8 +499,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       OTransactionInternal tx,
       boolean local,
       int retryCount) {
-    ODistributedDatabase localDistributedDatabase =
-        getStorageDistributed().getLocalDistributedDatabase();
+    ODistributedDatabase localDistributedDatabase = getDistributedShared();
     ONewDistributedTxContextImpl txContext =
         new ONewDistributedTxContextImpl(
             (ODistributedDatabaseImpl) localDistributedDatabase, requestId, tx, id);
@@ -589,6 +571,10 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
     return true;
   }
 
+  public ODistributedDatabase getDistributedShared() {
+    return getDistributedManager().getMessageService().getDatabase(getName());
+  }
+
   public void register(
       ODistributedRequestId requestId,
       ODistributedDatabase localDistributedDatabase,
@@ -612,10 +598,10 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   public boolean commit2pc(
       ODistributedRequestId transactionId, boolean local, ODistributedRequestId requestId) {
     ODistributedDatabaseImpl localDistributedDatabase =
-        (ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase();
+        (ODistributedDatabaseImpl) getDistributedShared();
     localDistributedDatabase.resetLastValidBackup();
 
-    ODistributedServerManager manager = getStorageDistributed().getDistributedManager();
+    ODistributedServerManager manager = getDistributedManager();
     ONewDistributedTxContextImpl txContext =
         (ONewDistributedTxContextImpl) localDistributedDatabase.getTxContext(transactionId);
 
@@ -736,8 +722,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
   }
 
   public boolean rollback2pc(ODistributedRequestId transactionId) {
-    ODistributedDatabase localDistributedDatabase =
-        getStorageDistributed().getLocalDistributedDatabase();
+    ODistributedDatabase localDistributedDatabase = getDistributedShared();
     ODistributedTxContext txContext = localDistributedDatabase.popTxContext(transactionId);
     if (txContext != null) {
       txContext.destroy();
@@ -764,8 +749,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   public void internalBegin2pc(ONewDistributedTxContextImpl txContext, boolean local) {
 
-    ODistributedDatabaseImpl localDb =
-        (ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase();
+    ODistributedDatabaseImpl localDb = (ODistributedDatabaseImpl) getDistributedShared();
 
     localDb.resetLastValidBackup();
     OTransactionInternal transaction = txContext.getTransaction();
@@ -784,25 +768,13 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
   private void firstPhaseDataChecks(
       boolean local, OTransactionInternal transaction, ONewDistributedTxContextImpl txContext) {
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageAfterOp("locks", txContext.getReqId());
+    getDistributedShared().getManager().messageAfterOp("locks", txContext.getReqId());
 
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageBeforeOp("allocate", txContext.getReqId());
+    getDistributedShared().getManager().messageBeforeOp("allocate", txContext.getReqId());
     ((OAbstractPaginatedStorage) getStorage().getUnderlying()).preallocateRids(transaction);
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageAfterOp("allocate", txContext.getReqId());
+    getDistributedShared().getManager().messageAfterOp("allocate", txContext.getReqId());
 
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageBeforeOp("indexCheck", txContext.getReqId());
+    getDistributedShared().getManager().messageBeforeOp("indexCheck", txContext.getReqId());
     for (Map.Entry<String, OTransactionIndexChanges> change :
         transaction.getIndexOperations().entrySet()) {
       OIndex index = getSharedContext().getIndexManager().getRawIndex(change.getKey());
@@ -872,15 +844,9 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       }
     }
 
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageAfterOp("indexCheck", txContext.getReqId());
+    getDistributedShared().getManager().messageAfterOp("indexCheck", txContext.getReqId());
 
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageBeforeOp("mvccCheck", txContext.getReqId());
+    getDistributedShared().getManager().messageBeforeOp("mvccCheck", txContext.getReqId());
     for (ORecordOperation entry : transaction.getRecordOperations()) {
       if (entry.getType() != ORecordOperation.CREATED) {
         int changeVersion = entry.getRecord().getVersion();
@@ -902,10 +868,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
         }
       }
     }
-    getStorageDistributed()
-        .getLocalDistributedDatabase()
-        .getManager()
-        .messageAfterOp("mvccCheck", txContext.getReqId());
+    getDistributedShared().getManager().messageAfterOp("mvccCheck", txContext.getReqId());
   }
 
   @Override
@@ -949,8 +912,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       super.command(command, new Object[] {}).close();
       return;
     }
-    ODistributedDatabaseImpl localDb =
-        (ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase();
+    ODistributedDatabaseImpl localDb = (ODistributedDatabaseImpl) getDistributedShared();
     localDb.resetLastValidBackup();
 
     checkNodeIsMaster(
@@ -1022,8 +984,7 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       sendDDLCommand(cmd, false);
       return true;
     } else {
-      ((ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase())
-          .resetLastValidBackup();
+      ((ODistributedDatabaseImpl) getDistributedShared()).resetLastValidBackup();
       return super.dropCluster(clusterName);
     }
   }
@@ -1035,15 +996,13 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       sendDDLCommand(cmd, false);
       return true;
     } else {
-      ((ODistributedDatabaseImpl) getStorageDistributed().getLocalDistributedDatabase())
-          .resetLastValidBackup();
+      ((ODistributedDatabaseImpl) getDistributedShared()).resetLastValidBackup();
       return super.dropCluster(clusterId);
     }
   }
 
   public boolean isLocalEnv() {
-    return getStorage() instanceof OAutoshardedStorage
-        && ((OAutoshardedStorage) getStorage()).isLocalEnv();
+    return OScenarioThreadLocal.INSTANCE.isRunModeDistributed();
   }
 
   public void acquireDistributedExclusiveLock(int timeout) {
@@ -1131,5 +1090,10 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
 
     OLogManager.instance().error(this, iMessage, e, iParams);
     throw OException.wrapException(new OStorageException(String.format(iMessage, iParams)), e);
+  }
+
+  @Override
+  public String getStorageId() {
+    return getDistributedManager().getLocalNodeName() + "." + getName();
   }
 }
