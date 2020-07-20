@@ -565,6 +565,9 @@ public class ODatabaseDocumentDistributed extends ODatabaseDocumentEmbedded {
       distributedManager.setDatabaseStatus(
           getLocalNodeName(), getName(), ODistributedServerManager.DB_STATUS.OFFLINE);
       throw ex;
+    } catch (RuntimeException e) {
+      txContext.destroy();
+      throw e;
     }
     return true;
   }
